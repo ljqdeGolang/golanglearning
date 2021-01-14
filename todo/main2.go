@@ -20,97 +20,100 @@ func init() {
 		fmt.Println(err.Error())
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&todoModel{})
+	db.AutoMigrate(&UserTodo{})
 }
 func main() {
 	router := gin.Default()
 	v1 := router.Group("/api/v1/todos")
 	{
-		v1.POST("/", createTodo)
-		v1.GET("/", fetchAllTodo)
-		v1.GET("/:id", fetchSingleTodo)
-		v1.PUT("/:id", updateTodo)
-		v1.DELETE("/:id", deleteTodo)
+		v1.POST("/", createtodo)
+		v1.GET("/", fetchAlltodo)
+		v1.GET("/:id", fetchSingletodo)
+		v1.PUT("/:id", updatetodo)
+		v1.DELETE("/:id", deletetodo)
 	}
 	router.Run()
 }
 
 type (
 	UserTodo struct {
-		Models.Base //这个的用处是什么？
 		gorm.Model
 		UserID              string    `gorm:"userid"`
 		UserTodoID          string    `gorm:"usertodoid"`
 		UserTodoTitle       string    `gorm:"usertodotitle"`
 		UserTodoDescription string    `gorm:"usertododescription"`
 		UserTodoDueTime     time.Time `gorm:"duetime"`
-		UerTodoRemindTime   time.Time `gorm:"remindtime"`
+		UserTodoRemindTime  time.Time `gorm:"remindtime"`
 		Status              bool      `gorm:"status"`
 	}
-	Base struct {
-		ID        uint      `json:"id" gorm:"primary_key"` //什么意思？grom和json都用？不可以只用一种？
-		CreatedAt time.Time `json:"createdat" gorm:"DEFAULT CURRENT_TIMESTAMP"`
-		UpdateAt  time.Time `json:"updateat" gorm:"DEFAULT CURRENT_YIMESTAMP ON UPDATE CURRENT_TIMESTAMP"`
-	}
+	// Base struct {
+	// 	ID        uint      `json:"id" gorm:"primary_key"` //什么意思？grom和json都用？不可以只用一种？
+	// 	CreatedAt time.Time `json:"createdat" gorm:"DEFAULT CURRENT_TIMESTAMP"`
+	// 	UpdateAt  time.Time `json:"updateat" gorm:"DEFAULT CURRENT_YIMESTAMP ON UPDATE CURRENT_TIMESTAMP"`
+	// }
 )
 
-func createTodo(c *gin.Context) {
-	completed, _ := strconv.Atoi(c.PostForm("completed"))
-	todo := todoModel{Title: c.PostForm("title"), Completed: completed}
+func createtodo(c *gin.Context) {
+	const shortForm = "2006-jan-02"
+	duetime, _ := time.Parse(shortForm, c.PostForm("duetime"))
+	remindtime, _ := time.Parse(shortForm, c.PostForm("remindtime"))
+	status, err := strconv.ParseBool(c.PostForm("status"))
+	if err != nil {
+		panic("状态输入错误")
+	}
+	todo := UserTodo{UserID: c.PostForm("userid"), UserTodoID: c.PostForm("usertodoid"), UserTodoTitle: c.PostForm("usertodotitle"),
+		UserTodoDescription: c.PostForm("usertododescription"), UserTodoDueTime: duetime, UserTodoRemindTime: remindtime, Status: status}
 	db.Save(&todo)
 	c.JSON(http.StatusCreated, gin.H{"status": http.StatusCreated, "message": "Todo item created sucessful!", "resourceID": todo.ID})
 }
-func fetchAllTodo(c *gin.Context) {
-	var todos []todoModel
-	var _todos []transformedTodo
+func fetchAlltodo(c *gin.Context) {
+	var todos []UserTodo
+	//var _todos []UserTodo
 	db.Find(&todos)
 	if len(todos) <= 0 {
 		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "No todo found!"})
 		return
 	}
-	for _, item := range todos {
-		completed := false
-		if item.Completed == 1 {
-			completed = true
-		} else {
-			completed = false
-		}
-		_todos = append(_todos, transformedTodo{ID: item.ID, Title: item.Title, Completed: completed})
-	}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "data": _todos})
+
+	//数据库数据共享，不用重新定义todos吧？
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "data": todos})
 }
-func fetchSingleTodo(c *gin.Context) {
-	var todo todoModel
+func fetchSingletodo(c *gin.Context) {
+	var todo UserTodo
 	todoID := c.Param("id")
 	db.First(&todo, todoID)
 	if todo.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "No todo found!"})
 		return
 	}
-	completed := false
-	if todo.Completed == 1 {
-		completed = true
-	} else {
-		completed = false
-	}
-	_todo := transformedTodo{ID: todo.ID, Title: todo.Title, Completed: completed}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "data": _todo})
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "data": todo})
 }
-func updateTodo(c *gin.Context) {
-	var todo todoModel
+func updatetodo(c *gin.Context) {
+	var todo UserTodo
 	todoID := c.Param("id")
 	db.First(&todo, todoID)
 	if todo.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "No todo found!"})
 		return
 	}
-	db.Model(&todo).Update("title", c.PostForm("title"))
-	completed, _ := strconv.Atoi(c.PostForm("completed"))
-	db.Model(&todo).Update("completed", completed)
+	db.Model(&todo).Update("UserID", c.PostForm("userid"))
+	db.Model(&todo).Update("UserTodoID", c.PostForm("usertodoid"))
+	db.Model(&todo).Update("UserTodoTitle", c.PostForm("usertodotitle"))
+	db.Model(&todo).Update("UserTodoDescription", c.PostForm("usertododescription"))
+	const shortForm = "2006-jan-02"
+	duetime, _ := time.Parse(shortForm, c.PostForm("duetime"))
+	remindtime, _ := time.Parse(shortForm, c.PostForm("remindtime"))
+	status, err := strconv.ParseBool(c.PostForm("status"))
+	if err != nil {
+		panic("状态输入错误")
+	}
+	db.Model(&todo).Update("UserTodoDueTime", duetime)
+	db.Model(&todo).Update("UserTodoRemindTime", remindtime)
+	db.Model(&todo).Update("Status", status)
 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "Todo updated successfully!"})
 }
-func deleteTodo(c *gin.Context) {
-	var todo todoModel
+func deletetodo(c *gin.Context) {
+	var todo UserTodo
 	todoID := c.Param("id")
 	db.First(&todo, todoID)
 	if todo.ID == 0 {
